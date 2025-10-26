@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=800, initial-scale=1.0">
+    <title>자동차 레이싱 게임</title>
+    <style>
+        body {
+            background: linear-gradient(to bottom, #1a1a2e, #16213e);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Arial', sans-serif;
+        }
+        #gameContainer {
+            position: relative;
+            background: #0f3460;
+            border-radius: 10px;
+            box-shadow: 0 10px 50px rgba(0,0,0,0.5);
+            overflow: hidden;
+        }
+        #gameCanvas {
+            background: #222;
+            display: block;
+        }
+        #hud {
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            padding: 15px;
+            background: rgba(0,0,0,0.5);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 18px;
+            font-weight: bold;
+        }
+        #hud > div {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        #startScreen, #gameOverScreen {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.85);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 25px;
+        }
+        .hidden { display: none !important; }
+        .ui-button {
+            padding: 16px 44px;
+            font-size: 22px;
+            color: #fff; background: #e94560;
+            border: none; border-radius: 5px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 5px 15px rgba(233,69,96,0.3);
+            transition: background 0.2s;
+        }
+        .ui-button:hover { background: #ff5577; }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <!-- 메인 캔버스 -->
+        <canvas id="gameCanvas" width="800" height="600"></canvas>
+        <!-- HUD -->
+        <div id="hud">
+            <div>
+                <span>순위: <b id="position">1위</b></span>
+                <span>랩: <b id="lap">1</b> / 3</span>
+            </div>
+            <div>
+                <span>속도: <b id="speed">0</b> km/h</span>
+                <span>시간: <b id="time">0.0</b> s</span>
+            </div>
+        </div>
+        <!-- 시작 오버레이 -->
+        <div id="startScreen">
+            <h1>🏎️ 자동차 레이싱</h1>
+            <div style="color:#bbb; font-size:16px; margin-bottom:10px;">
+                <p>⬆️ 가속  ⬇️ 감속  ⬅️ 좌회전  ➡️ 우회전</p>
+                <p>AI 차량을 제치고 3랩 먼저 완주하세요!</p>
+            </div>
+            <button id="startButton" class="ui-button">게임 시작</button>
+        </div>
+        <!-- 게임오버 오버레이 -->
+        <div id="gameOverScreen" class="hidden">
+            <h2>경주 종료!</h2>
+            <div style="margin:16px 0; font-size:20px;">
+                <span>최종 순위: <b id="finalPosition">-</b></span><br>
+                <span>완주 시간: <b id="finalTime">-</b></span>
+            </div>
+            <button id="restartButton" class="ui-button">다시 시작</button>
+        </div>
+    </div>
+    <!-- 이후 단계에서 스크립트 추가 예정 -->
+    <script>
+        // 3-4단계: 캔버스, 오브젝트, 입력 및 단순 이동
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        let gameState = 'start';
+
+        // 도로 구성
+        const road = {
+            x: 200,
+            y: 50,
+            width: 400,
+            height: 500
+        };
+
+        // 입력 상태
+        const keys = { ArrowUp:false, ArrowDown:false, ArrowLeft:false, ArrowRight:false };
+        document.addEventListener('keydown', e => { if (e.key in keys) keys[e.key]=true; });
+        document.addEventListener('keyup', e => { if (e.key in keys) keys[e.key]=false; });
+
+        class Car {
+            constructor(x, y, color, isPlayer = false) {
+                this.x = x; this.y = y;
+                this.width = 40; this.height = 70;
+                this.color = color;
+                this.isPlayer = isPlayer;
+                this.speed = 0; // 속도
+                this.maxSpeed = isPlayer ? 8 : 6;
+            }
+            update() {
+                if (this.isPlayer) {
+                    // 방향키 이동
+                    if (keys.ArrowUp) this.y -= this.maxSpeed;
+                    if (keys.ArrowDown) this.y += this.maxSpeed;
+                    if (keys.ArrowLeft) this.x -= 8;
+                    if (keys.ArrowRight) this.x += 8;
+                    // 도로 경계
+                    if (this.x < road.x + 20) this.x = road.x + 20;
+                    if (this.x > road.x + road.width - 20) this.x = road.x + road.width - 20;
+                    if (this.y < road.y + 30) this.y = road.y + 30;
+                    if (this.y > road.y + road.height - 35) this.y = road.y + road.height - 35;
+                } else {
+                    // AI: 자동 전진만(임시)
+                    this.y -= this.maxSpeed * 0.8;
+                    // 도로 경계 자동 복귀
+                    if (this.x < road.x + 20) this.x += 3;
+                    if (this.x > road.x + road.width - 20) this.x -= 3;
+                    if (this.y < road.y + 30) this.y = road.y + road.height - 40;
+                }
+            }
+            draw(ctx) {
+                ctx.save();
+                ctx.fillStyle = this.color;
+                ctx.fillRect(this.x - this.width/2, this.y - this.height/2, this.width, this.height);
+                if (this.isPlayer) {
+                    ctx.strokeStyle = '#fff'; ctx.lineWidth = 3;
+                    ctx.strokeRect(this.x - this.width/2, this.y - this.height/2, this.width, this.height);
+                }
+                ctx.restore();
+            }
+        }
+        // 플레이어/AI 자동차 생성
+        const player = new Car(road.x + road.width/2, road.y + road.height - 60, '#e94560', true);
+        const aiCars = [
+            new Car(road.x + 100, road.y + 120, '#3498db'),
+            new Car(road.x + 300, road.y + 220, '#2ecc71'),
+            new Car(road.x + 200, road.y + 180, '#ffeb3b')
+        ];
+        class BgObject {
+            constructor(x, y, type) { this.x = x; this.y = y; this.type = type; }
+            draw(ctx) {
+                if (this.type === 'tree') {
+                    ctx.fillStyle = '#1a3d0a'; ctx.fillRect(this.x - 5, this.y, 10, 24);
+                    ctx.beginPath(); ctx.arc(this.x, this.y, 15, 0, Math.PI*2);
+                    ctx.fillStyle = '#2d5016'; ctx.fill();
+                } else if (this.type === 'sign') {
+                    ctx.fillStyle = '#ffd700'; ctx.fillRect(this.x - 10, this.y - 20, 20, 20);
+                    ctx.fillStyle = '#666'; ctx.fillRect(this.x - 2, this.y, 4, 18);
+                }
+            }
+        }
+        const bgObjects = [];
+        for (let i=0; i<7; i++) {
+            let tx = road.x-30+Math.random()*40;
+            bgObjects.push(new BgObject(tx, road.y+60+i*60, 'tree'));
+            let tx2 = road.x+road.width+10+Math.random()*40;
+            bgObjects.push(new BgObject(tx2, road.y+95+i*70, Math.random()>0.5?'tree':'sign'));
+        }
+        function gameLoop() {
+            ctx.clearRect(0,0,canvas.width,canvas.height);
+            ctx.fillStyle = '#555'; ctx.fillRect(road.x, road.y, road.width, road.height);
+            ctx.fillStyle = '#fff'; ctx.fillRect(road.x, road.y, 10, road.height);
+            ctx.fillRect(road.x+road.width-10, road.y, 10, road.height);
+            ctx.fillStyle = '#ffd700';
+            for (let y=road.y+12;y<road.y+road.height;y+=44) ctx.fillRect(road.x+road.width/2-2, y, 4, 26);
+            bgObjects.forEach(obj=>obj.draw(ctx));
+            aiCars.forEach(car => { car.update(); car.draw(ctx); });
+            player.update(); player.draw(ctx);
+            requestAnimationFrame(gameLoop);
+        }
+        window.onload = ()=>{ gameLoop(); };
+    </script>
+</body>
+</html>
+
